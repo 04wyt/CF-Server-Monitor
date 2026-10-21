@@ -1574,10 +1574,16 @@ const getReplaySampleData = (sample) => {
 
 const buildLiveStatusData = (event) => {
   const receiveTs = Date.now()
+  // last_updated 必须使用上报方的时间戳，不能用浏览器接收时间，
+  // 否则离线重放缓存上报时会把「最后更新」显示成当前时间。
+  const reportTs = normalizeMetricTimestamp(
+    event?.data?.last_updated ?? event?.data?.timestamp ?? event?.ts,
+    receiveTs
+  )
   return {
     ...event.data,
-    sample_timestamp: event.ts,
-    last_updated: receiveTs,
+    sample_timestamp: reportTs,
+    last_updated: reportTs,
     timestamp: receiveTs
   }
 }
