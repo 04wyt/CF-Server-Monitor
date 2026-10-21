@@ -114,6 +114,7 @@
           :active-tab="activeTab"
           :selected-api-index="selectedApiIndex"
           :latest-agent-version="latestAgentVersion"
+          :cache-refreshing="cacheRefreshing"
           :copied-server-id="copiedServerId"
           :copied-note-server-id="copiedNoteServerId"
           :copied-spec-key="copiedSpecKey"
@@ -121,6 +122,7 @@
           @batch-edit="openBatchEditModal"
           @batch-delete="batchDelete"
           @toggle-select-all="toggleSelectAll"
+          @refresh-cache="refreshServersCache"
           @select-all="handleSelectAll"
           @drag-start="handleDragStart"
           @drop="handleDrop"
@@ -140,6 +142,8 @@
           :password-visible="passwordVisible"
           :active-tab="activeTab"
           :selected-api-base="selectedApiBase"
+          :auto-discovery-command="autoDiscoveryInstallCommand"
+          :auto-discovery-saved="savedAutoDiscovery"
           :current-origin="currentOrigin"
           :saving="saving"
           :change-admin-password="changeAdminPassword"
@@ -983,6 +987,8 @@ const settings = ref({
   csp_api: ''
 })
 const apiSecret = ref('')
+const cacheRefreshing = ref(false)
+const savedAutoDiscovery = ref(false)
 const changeAdminPassword = ref(false)
 
 const clearAdminPasswordInputs = () => {
@@ -1430,6 +1436,8 @@ const loadSettings = async () => {
       applyMikusThemeOptions(settingsData.theme_options)
       changeAdminPassword.value = !settings.value.password_configured || !String(settings.value.username || '').trim()
       apiSecret.value = data.api_secret || ''
+      // 只有已保存到服务端的自动发现开关才提供复制安装命令，避免复制出当前并未生效的命令
+      savedAutoDiscovery.value = settings.value.auto_discovery
     }
   } catch (e) {
     console.error('[ERROR] Load settings failed:', e)
@@ -1651,9 +1659,9 @@ const saveSettings = async () => {
 }
 
 
-const loadServers = async () => {
+const loadServers = async (options = {}) => {
   try {
-    const result = await adminApiForSite({ action: 'list' })
+    const result = await adminApiForSite(options.refresh ? { action: 'list', refresh: true } : { action: 'list' })
     if (!result.error) {
       const data = result.data
       servers.value = data.servers || []
@@ -1662,8 +1670,26 @@ const loadServers = async () => {
       const serverGroups = [...new Set(servers.value.map(s => s.server_group || trans.value.default))]
       groups.value = serverGroups
     }
+    return result
   } catch (e) {
     console.error('[ERROR] Load servers failed:', e)
+    return { error: e.message }
+  }
+}
+
+// 清除 Workers 端服务器列表缓存并就地重新拉取（list 带 refresh 时服务端先清缓存再读 D1）
+const refreshServersCache = async () => {
+  if (cacheRefreshing.value) return
+  cacheRefreshing.value = true
+  try {
+    const result = await loadServers({ refresh: true })
+    if (result?.error) {
+      alertMessage.value = getMessage(result.error) || result.error || trans.value.operationFailed
+      return
+    }
+    alertMessage.value = trans.value.cacheCleared
+  } finally {
+    cacheRefreshing.value = false
   }
 }
 
@@ -1864,7 +1890,7 @@ const getCustomInstallCommand = () => {
     if (version) params.push(quotePowerShellArg(`--install-version=${version}`))
     params.push(
       `-id='${copyServerId.value}'`,
-      `-secret='${apiSecret.value}'`,
+      `-secret=${quotePowerShellArg(apiSecret.value)}`,
       `-url='${HOST}/update'`,
       `-auto_update='${autoUpdateFlag}'`
     )
@@ -1886,7 +1912,7 @@ const getCustomInstallCommand = () => {
   if (version) params.push(quotePosixShellArg(`--install-version=${version}`))
   params.push(
     `-id=${copyServerId.value}`,
-    `-secret='${apiSecret.value}'`,
+    `-secret=${quotePosixShellArg(apiSecret.value)}`,
     `-url=${HOST}/update`,
     `-auto_update=${autoUpdateFlag}`
   )
@@ -1896,6 +1922,19 @@ const getCustomInstallCommand = () => {
 
   return buildInstallAsCfsmCommand(installCommand, trans.value.nonRootInstallRunStep)
 }
+
+// 自动发现模式下安装命令不带 -id：Agent 首次上报时由服务端自动创建服务器
+const autoDiscoveryInstallCommand = computed(() => {
+  const HOST = selectedApiBase.value
+  const params = [
+    'install',
+    `-secret=${quotePosixShellArg(apiSecret.value)}`,
+    `-url=${HOST}/update`,
+    '-auto_update=0'
+  ]
+  const ghUrl = buildGhRawUrl('', '/huilang-me/cfsm-agent/main/install.sh')
+  return `curl -fsSL ${quotePosixShellArg(ghUrl)} | sh -s -- ${params.join(' ')}`
+})
 
 const copyCustomCmd = async () => {
   const cmd = getCustomInstallCommand()

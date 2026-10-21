@@ -2246,6 +2246,31 @@ body::before {
     padding: 16px;
 }
 
+/* 设置页保存栏：吸附在视口底部，长表单滚动时也能随时保存 */
+.settings-save-bar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 12px 16px;
+    background: color-mix(in srgb, var(--bg-card) 78%, var(--bg-primary));
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.settings-save-hint {
+    margin-right: auto;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 .ping-node-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2790,6 +2815,10 @@ body::before {
 
 .checkbox-item .help-tooltip {
     margin-left: -4px;
+}
+
+.checkbox-item .auto-discovery-copy {
+    margin-left: 4px;
 }
 
 .checkbox-item .checkbox-badge {
@@ -5080,6 +5109,19 @@ body.mikus-theme .mikus-stats-mascot-img {
 
     .settings-section {
         margin-bottom: 12px;
+    }
+
+    .settings-save-bar {
+        bottom: 8px;
+        padding: 10px 12px;
+    }
+
+    .settings-save-hint {
+        display: none;
+    }
+
+    .settings-save-bar .btn {
+        width: 100%;
     }
 
     .settings-grid .form-row {

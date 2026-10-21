@@ -66,7 +66,7 @@ Compared with traditional controller-style monitoring tools, CF-Server-Monitor i
 | History | 7-day charts, long-range sampling, realtime network speed, monthly traffic and correction |
 | Network quality | Latency and packet loss tracking for CT, CU, CM, and BGP nodes; when three-net details are enabled, the dashboard samples up to 20 real points from the last 2 hours of D1 history and caches them for 5 minutes |
 | Dashboard views | Bar chart, ring chart, table, and map views for desktop and mobile |
-| Admin panel | Server CRUD, drag sorting, hidden servers, import/export, batch delete, database maintenance |
+| Admin panel | Server CRUD, drag sorting, hidden servers, import/export, batch delete, server-list cache refresh, database maintenance |
 | Cross-platform Agent | Mainstream Linux, Alpine Linux, OpenWrt, Synology DSM, Feiniu fnOS, FreeBSD, macOS, Windows, plus Docker image deployment; Go Agent by default, Shell/PowerShell still available |
 | Realtime push | Durable Objects + WebSocket refresh the UI immediately after Agent reports |
 | Alerts | Offline alerts, recovery notices, expiration reminders, resource load rules |
@@ -196,6 +196,8 @@ Change the admin username and password after login. The admin password can be se
 
 For larger fleets you can enable **Auto Discovery** under Settings → Site Settings: install the Agent without `-id` and the server is created automatically on the first report. The name comes from `-name`, or the client IP (`CF-Connecting-IP`) when omitted. An existing server with the same name is never reused: the server rejects that report with 404 and the agent logs a hint and exits instead. New servers may take up to 2 minutes to appear on the dashboard; creation failures, or a server that does not have Auto Discovery enabled, also log a single hint and exit without retrying, notifying, or leaving any marker file behind. The switch is off by default.
 
+After Auto Discovery is saved, a copy button appears next to the switch in Settings → Site Settings and copies this `-id`-free Linux install command.
+
 Install command without `-id` (Linux, OpenWrt, Synology DSM, FreeBSD, macOS):
 
 ```bash
@@ -298,7 +300,7 @@ npm run build:github-page
 
 | Category | Main options |
 | --- | --- |
-| Site | Title, background, favicon, default display mode, default appearance, default language, three-net details, public access |
+| Site | Title, background, favicon, default display mode, default appearance, default language, three-net details, public access, auto discovery (with a copy button for the `-id`-free Linux install command) |
 | Server | HTTP/WSS report intervals, collect interval, ping nodes, network interfaces, monthly traffic, price, expiration, auto-renew |
 | Security | Admin account, password, JWT Secret, Turnstile |
 | Notifications | Offline alerts, expiration reminders, resource alerts, test notification |

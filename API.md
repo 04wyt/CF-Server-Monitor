@@ -1197,8 +1197,10 @@ Header：`X-Turnstile-Token: <token>`（当 `site_options.turnstile_enabled` 或
 **Request**
 
 ```json
-{ "action": "list" }
+{ "action": "list", "refresh": false }
 ```
+
+- `refresh`（可选，默认 `false`）：为 `true` 时先清空本 isolate 的服务器列表/详情缓存再查询 D1，用于管理后台「刷新缓存」按钮，保证返回的是最新数据。
 
 **Response 200**
 
