@@ -177,6 +177,14 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group flex-1 checkbox-item">
+            <input type="checkbox" id="cfg_auto_discovery" v-model="settings.auto_discovery">
+            <label><b>{{ trans.autoDiscovery }}</b></label>
+            <HelpTooltip :text="trans.autoDiscoveryTip" />
+          </div>
+        </div>
+
         <div v-if="settings.wss_report_enabled" class="wss-schedule">
           <div class="wss-schedule-header">
             <div>

@@ -933,6 +933,7 @@ const settings = ref({
   preferred_theme: 'auto',
   default_language: 'auto',
   theme_options: '{}',
+  auto_discovery: false,
   is_public: false,
   show_price: true,
   show_expire: true,
@@ -1375,6 +1376,7 @@ const loadSettings = async () => {
         preferred_theme: normalizePreferredThemeSetting(settingsData.preferred_theme),
         default_language: normalizeDefaultLanguageSetting(settingsData.default_language),
         theme_options: formatThemeOptions(settingsData.theme_options),
+        auto_discovery: settingsData.auto_discovery === 'true' || settingsData.auto_discovery === true,
         is_public: settingsData.is_public === 'true',
         show_price: settingsData.show_price === 'true',
         show_expire: settingsData.show_expire === 'true',
@@ -1573,6 +1575,7 @@ const saveSettings = async () => {
       appearance_options: {
         theme_options: themeOptionsResult.value
       },
+      auto_discovery: settings.value.auto_discovery ? 'true' : 'false',
       is_public: settings.value.is_public ? 'true' : 'false',
       show_price: settings.value.show_price ? 'true' : 'false',
       show_expire: settings.value.show_expire ? 'true' : 'false',
