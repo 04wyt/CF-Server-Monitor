@@ -194,7 +194,7 @@ Change the admin username and password after login. The admin password can be se
 4. Click the copy button, choose the target system and Agent version.
 5. Run the generated command on the target server.
 
-For larger fleets you can enable **Auto Discovery** under Settings → Site Settings: install the Agent without `-id` and the server is created automatically on the first report. The name comes from `-name`, or the client IP (`CF-Connecting-IP`) when omitted. An existing server with the same name is never reused: the server rejects that report with 404 and the agent logs a hint and exits instead. New servers may take up to 2 minutes to appear on the dashboard; creation failures also log a single hint and exit without retrying, notifying, or leaving any marker file behind. The switch is off by default.
+For larger fleets you can enable **Auto Discovery** under Settings → Site Settings: install the Agent without `-id` and the server is created automatically on the first report. The name comes from `-name`, or the client IP (`CF-Connecting-IP`) when omitted. An existing server with the same name is never reused: the server rejects that report with 404 and the agent logs a hint and exits instead. New servers may take up to 2 minutes to appear on the dashboard; creation failures, or a server that does not have Auto Discovery enabled, also log a single hint and exit without retrying, notifying, or leaving any marker file behind. The switch is off by default.
 
 Install command without `-id` (Linux, OpenWrt, Synology DSM, FreeBSD, macOS):
 

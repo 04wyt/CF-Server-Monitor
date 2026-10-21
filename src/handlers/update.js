@@ -656,9 +656,19 @@ async function handleUpdateCore(request, env, ctx, discovery) {
         }
 
         if (result.id) {
+          // 建号已经成功，id 必须先记下来：即使随后读详情失败，也要通过响应头回传，
+          // 否则 Agent 下次上报仍是空 id，只会撞到同名服务器（reused）然后退出。
           discovery.id = result.id;
           clearServerDetailCache();
-          serverDetail = await getServerDetail(env.DB, result.id, true);
+          try {
+            serverDetail = await getServerDetail(env.DB, result.id, true);
+          } catch (e) {
+            console.warn('[AutoDiscovery] reload failed after create', {
+              id: result.id,
+              error: e?.message || e
+            });
+            serverDetail = null;
+          }
         }
       }
     }

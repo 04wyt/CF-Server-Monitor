@@ -409,6 +409,7 @@ CORS_ALLOWED_ORIGINS=https://status.example.com,https://admin.example.com
   - 创建失败只写服务端日志，返回下方原有 404，不重试、不发送通知；Agent 收到 `failed` 后会在本次运行内停止自动发现与上报（空 `id` 的上报必然是 404），重启 Agent 服务后才会重新尝试一次。
   - 建号前先校验本次上报能否入库（`samples`/`metrics` 为空、`rx_correction`/`tx_correction` 非法时直接返回 400），校验不通过不会建号，避免留下永远不会被写入的空壳服务器。
   - 该分支只在 `id` 为空时生效；`id` 非空但查不到仍返回 404，已删除的服务器不会被自动重建。
+  - 未开启自动发现时，空 `id` 的上报仍是原有 404，且不带任何自动发现响应头；Agent 应据此提示用户开启自动发现或改用 `-id` 安装后退出，不要静默重试。
   - `wss://.../update` 不参与自动发现：未绑定的 Agent 必须先通过 POST 建号，再按下发的 `connection_mode` 切换。
 - 失败：
   ```json

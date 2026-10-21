@@ -9,7 +9,7 @@ import {
   isAutoDiscoveryEnabled,
   resolveDiscoveredServerName
 } from '../src/utils/autoDiscovery.js';
-import { clearServersListCache } from '../src/utils/cache.js';
+import { clearServerDetailCache, clearServersListCache } from '../src/utils/cache.js';
 import { clearSiteSettingsCache } from '../src/utils/settings.js';
 import { handleUpdate } from '../src/handlers/update.js';
 
@@ -17,7 +17,7 @@ const normalizeSql = (sql) => String(sql).replace(/\s+/g, ' ').trim();
 
 function createFakeDb(initialServers = [], siteOptions = null) {
   const servers = initialServers.map(server => ({ ...server }));
-  const state = { inserted: [], deleted: [], failInsert: false };
+  const state = { inserted: [], deleted: [], failInsert: false, failSelectById: false };
 
   function prepare(sql) {
     const text = normalizeSql(sql);
@@ -41,6 +41,11 @@ function createFakeDb(initialServers = [], siteOptions = null) {
               String(a.id).localeCompare(String(b.id))
             );
           return matches.length > 0 ? { id: matches[0].id } : null;
+        }
+        if (/^SELECT \* FROM servers WHERE id = \?$/.test(text)) {
+          if (state.failSelectById) throw new Error('D1_ERROR');
+          const row = servers.find(server => server.id === args[0]);
+          return row ? { ...row } : null;
         }
         if (/MAX\(sort_order\)/.test(text)) {
           const maxOrder = servers.reduce(
@@ -264,10 +269,38 @@ test('handleUpdate creates the server once the payload is valid', async () => {
     { waitUntil() {} }
   );
 
+  assert.equal(response.status, 200);
   assert.equal(response.headers.get('X-CFSM-Auto-Discovery'), AUTO_DISCOVERY_MODE_CREATED);
   assert.equal(db.state.inserted.length, 1);
   assert.equal(db.servers.length, 1);
   assert.equal(db.servers[0].name, 'web-01');
+  assert.equal(response.headers.get('X-CFSM-Server-Id'), db.servers[0].id);
+  clearSiteSettingsCache();
+});
+
+// 建号已经成功，只是随后读详情失败：必须仍然回传 id，
+// 否则 Agent 下一次上报还是空 id，只会撞到同名服务器然后退出。
+test('handleUpdate still returns the new id when reloading the detail fails', async () => {
+  clearServersListCache();
+  clearServerDetailCache();
+  clearSiteSettingsCache();
+  const db = createFakeDb([], { auto_discovery: 'true' });
+  db.state.failSelectById = true;
+  const request = new Request('https://example.com/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: '', secret: 'test-secret', name: 'web-01', metrics: { cpu: '1' } })
+  });
+
+  const response = await handleUpdate(
+    request,
+    { API_SECRET: 'test-secret', DB: db },
+    { waitUntil() {} }
+  );
+
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('X-CFSM-Auto-Discovery'), AUTO_DISCOVERY_MODE_CREATED);
+  assert.equal(db.state.inserted.length, 1);
   assert.equal(response.headers.get('X-CFSM-Server-Id'), db.servers[0].id);
   clearSiteSettingsCache();
 });
