@@ -41,24 +41,12 @@ function sanitizeIpValue(value) {
   return ip;
 }
 
-// 名称优先级：显式 name → Agent 自探测公网 IPv4 → 公网 IPv6 → 连接来源 IP。
-// 纯 IPv6 主机没有 IPv4（Agent 会回填 "0"），因此必须在连接来源 IP 之前尝试 ip_v6。
-export function resolveDiscoveredServerName({ name, metrics, request } = {}) {
+// 名称优先级：显式 name（≤100 字符）→ 连接来源 IP（CF-Connecting-IP）。
+export function resolveDiscoveredServerName({ name, request } = {}) {
   const explicit = sanitizeServerName(name);
   if (explicit) return explicit;
 
-  const candidates = [
-    metrics?.ip_v4 ?? metrics?.ipV4,
-    metrics?.ip_v6 ?? metrics?.ipV6,
-    request?.headers?.get('CF-Connecting-IP')
-  ];
-
-  for (const candidate of candidates) {
-    const ip = sanitizeIpValue(candidate);
-    if (ip) return ip;
-  }
-
-  return '';
+  return sanitizeIpValue(request?.headers?.get('CF-Connecting-IP'));
 }
 
 async function findServerIdByName(db, name) {

@@ -30,6 +30,7 @@ import {
   HISTORY_METRIC_AGGREGATION_POLICY
 } from '../utils/historyFields.js';
 import {
+  AUTO_DISCOVERY_MODE_REUSED,
   AUTO_DISCOVERY_STATUS_HEADER,
   AUTO_DISCOVERY_SERVER_ID_HEADER,
   discoverServer,
@@ -647,9 +648,15 @@ async function handleUpdateCore(request, env, ctx, discovery) {
 
         discovery.mode = result.mode;
         discovery.code = result.code;
-        discovery.id = result.id;
+
+        // 同名服务器已存在时拒绝本次写入：不建号、不落库、不回传已有 id。
+        // 无 name 时名称取 CF-Connecting-IP，NAT/同出口下极易撞名，复用会把两台机器的数据混在一起。
+        if (result.mode === AUTO_DISCOVERY_MODE_REUSED) {
+          return createServerNotFoundResponse();
+        }
 
         if (result.id) {
+          discovery.id = result.id;
           clearServerDetailCache();
           serverDetail = await getServerDetail(env.DB, result.id, true);
         }

@@ -96,11 +96,10 @@ test('isAutoDiscoveryEnabled only accepts the explicit switch', () => {
   assert.equal(isAutoDiscoveryEnabled(), false);
 });
 
-test('resolveDiscoveredServerName prefers name, then ip_v4, ip_v6, then CF-Connecting-IP', () => {
+test('resolveDiscoveredServerName prefers name, then CF-Connecting-IP', () => {
   assert.equal(
     resolveDiscoveredServerName({
       name: ' web-01 ',
-      metrics: { ip_v4: '203.0.113.9' },
       request: { headers: { get: () => '198.51.100.7' } }
     }),
     'web-01'
@@ -108,42 +107,33 @@ test('resolveDiscoveredServerName prefers name, then ip_v4, ip_v6, then CF-Conne
 
   assert.equal(
     resolveDiscoveredServerName({
-      metrics: { ip_v4: '203.0.113.9' },
-      request: { headers: { get: () => '198.51.100.7' } }
-    }),
-    '203.0.113.9'
-  );
-
-  assert.equal(
-    resolveDiscoveredServerName({
-      metrics: {},
       request: { headers: { get: () => '198.51.100.7' } }
     }),
     '198.51.100.7'
   );
 
-  assert.equal(resolveDiscoveredServerName({ metrics: {}, request: null }), '');
+  assert.equal(resolveDiscoveredServerName({ request: null }), '');
   assert.equal(resolveDiscoveredServerName(), '');
 
-  // Agent 公网 IP 查询失败时会回填 "0"，不能被当成服务器名称。
+  // metrics.ip_v4 / ip_v6 不再参与命名。
   assert.equal(
     resolveDiscoveredServerName({
-      metrics: { ip_v4: '0' },
+      metrics: { ip_v4: '203.0.113.9', ip_v6: '2001:db8::1' },
       request: { headers: { get: () => '198.51.100.7' } }
     }),
     '198.51.100.7'
   );
-  assert.equal(resolveDiscoveredServerName({ metrics: { ip_v4: '0.0.0.0' } }), '');
+  assert.equal(resolveDiscoveredServerName({ metrics: { ip_v4: '203.0.113.9' } }), '');
 
-  // 纯 IPv6 主机：ip_v4 为占位值，应回退到 ip_v6 而不是连接来源 IP。
+  // 连接来源 IP 的占位值同样不能被当成服务器名称。
   assert.equal(
-    resolveDiscoveredServerName({
-      metrics: { ip_v4: '0', ip_v6: '2001:db8::1' },
-      request: { headers: { get: () => '198.51.100.7' } }
-    }),
-    '2001:db8::1'
+    resolveDiscoveredServerName({ request: { headers: { get: () => '0' } } }),
+    ''
   );
-  assert.equal(resolveDiscoveredServerName({ metrics: { ip_v4: '0', ip_v6: '0' } }), '');
+  assert.equal(
+    resolveDiscoveredServerName({ request: { headers: { get: () => '0.0.0.0' } } }),
+    ''
+  );
 });
 
 test('discoverServer creates a server when no server matches the name', async () => {
@@ -175,14 +165,17 @@ test('discoverServer reuses an existing server with the same name', async () => 
   assert.deepEqual(db.state.inserted, []);
 });
 
-test('discoverServer uses the reported public IPv4 as the name', async () => {
+test('discoverServer uses CF-Connecting-IP as the name', async () => {
   clearServersListCache();
   const db = createFakeDb();
 
-  const result = await discoverServer({ DB: db }, { metrics: { ip_v4: '203.0.113.9' } });
+  const result = await discoverServer(
+    { DB: db },
+    { request: { headers: { get: () => '198.51.100.7' } } }
+  );
 
   assert.equal(result.mode, AUTO_DISCOVERY_MODE_CREATED);
-  assert.equal(db.servers[0].name, '203.0.113.9');
+  assert.equal(db.servers[0].name, '198.51.100.7');
 });
 
 test('discoverServer fails silently without any name source', async () => {
@@ -276,5 +269,32 @@ test('handleUpdate creates the server once the payload is valid', async () => {
   assert.equal(db.servers.length, 1);
   assert.equal(db.servers[0].name, 'web-01');
   assert.equal(response.headers.get('X-CFSM-Server-Id'), db.servers[0].id);
+  clearSiteSettingsCache();
+});
+
+test('handleUpdate refuses to write when the discovered name already exists', async () => {
+  clearServersListCache();
+  clearSiteSettingsCache();
+  const db = createFakeDb(
+    [{ id: 'existing-id', name: '198.51.100.7', sort_order: 0, timestamp: 1, history_partition_id: 1 }],
+    { auto_discovery: 'true' }
+  );
+  const request = new Request('https://example.com/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '198.51.100.7' },
+    body: JSON.stringify({ id: '', secret: 'test-secret', metrics: { cpu: '1' } })
+  });
+
+  const response = await handleUpdate(
+    request,
+    { API_SECRET: 'test-secret', DB: db },
+    { waitUntil() {} }
+  );
+
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('X-CFSM-Auto-Discovery'), AUTO_DISCOVERY_MODE_REUSED);
+  assert.equal(response.headers.get('X-CFSM-Server-Id'), null);
+  assert.deepEqual(db.state.inserted, []);
+  assert.equal(db.servers.length, 1);
   clearSiteSettingsCache();
 });

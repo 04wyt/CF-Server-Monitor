@@ -402,9 +402,9 @@ CORS_ALLOWED_ORIGINS=https://status.example.com,https://admin.example.com
 - ~~动态配置包含 `traffic_calc_type`、`traffic_limit`、`auto_update` 等全部探针运行参数。~~ **2026-07-26 修订，2026-07-31 更新，2026-08-15 更新，2026-08-18 更新，2026-08-19 更新，2026-08-28 更新**：schema `3` 不包含 `connection_mode`；schema `4` 增加 `connection_mode`，并保持原有序列化与 MD5 计算不变；schema `5` 在 WSS 全局开启且服务器 `connection_mode=auto` 时追加 `wss_report_interval`（`1-5` 秒，默认 `2`），并将 `collect_interval=0` 或大于 WSS 间隔的值规范为 WSS 间隔；schema `6` 追加 `ping_mode`（`tcp|icmp`，默认 `tcp`），参与配置 MD5 并下发给 Agent。待应用的 `rx_correction`、`tx_correction` 会追加到响应体，但不参与配置 MD5；启用自动更新且版本不一致时追加 `update=1`。
 - 探针应用流量修正后，可在下一次 `POST /update` 顶层回传 `rx_correction` / `tx_correction`。值匹配时后端清空待修正字段并直接返回纯文本 `OK`，本次请求不要求 `metrics`。
 - **自动发现（2026-10-21 新增）**：`site_options.auto_discovery === 'true'` 时，若请求体 `id` 为空，服务端会在本次请求内创建服务器并继续正常入库：
-  - 名称优先级：请求体 `name`（≤100 字符）→ `metrics.ip_v4` → `metrics.ip_v6` → 请求头 `CF-Connecting-IP`；都取不到时放弃创建。`ip_v4` / `ip_v6` 为 `"0"`、`"0.0.0.0"` 等占位值（Agent 公网 IP 查询失败）时视为无效，纯 IPv6 主机会用 `ip_v6` 命名。
-  - 去重：已存在同名服务器时不新建，返回 `reused` 及其 `id`；Agent 收到 `reused` 后应输出提示并退出（不复用该 `id`），避免把本机数据写进同名服务器。
-  - 新建/复用的 `id` 通过响应头 `X-CFSM-Server-Id` 回传，Agent 需落盘并在后续请求中使用。
+  - 名称优先级：请求体 `name`（≤100 字符）→ 请求头 `CF-Connecting-IP`；都取不到时放弃创建。`CF-Connecting-IP` 为 `"0"`、`"0.0.0.0"` 等占位值时视为无效。`metrics.ip_v4` / `metrics.ip_v6` 不参与命名。
+  - 去重：已存在同名服务器时不新建，也不写入本次上报（直接返回 404），响应头标记 `reused` 且不回传 `X-CFSM-Server-Id`；Agent 收到 `reused` 后应输出提示并退出，避免把本机数据写进同名服务器。
+  - 新建的 `id` 通过响应头 `X-CFSM-Server-Id` 回传，Agent 需落盘并在后续请求中使用。
   - 结果标记通过响应头 `X-CFSM-Auto-Discovery` 回传：`created`、`reused`、`failed:<code>`（`no_name` / `db_error`）。
   - 创建失败只写服务端日志，返回下方原有 404，不重试、不发送通知；Agent 收到 `failed` 后会在本次运行内停止自动发现与上报（空 `id` 的上报必然是 404），重启 Agent 服务后才会重新尝试一次。
   - 建号前先校验本次上报能否入库（`samples`/`metrics` 为空、`rx_correction`/`tx_correction` 非法时直接返回 400），校验不通过不会建号，避免留下永远不会被写入的空壳服务器。
