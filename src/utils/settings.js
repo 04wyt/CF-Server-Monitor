@@ -681,6 +681,12 @@ export async function loadSiteSettings(db, options = {}) {
     result.traffic_alert_threshold = normalizeTrafficAlertThreshold(result.traffic_alert_threshold);
   } catch (e) {
     console.error('加载站点设置失败:', e);
+    if (cachedSiteSettings) {
+      // 保留上次配置，避免 D1 抖动把通知等设置重置为默认值。
+      // 沿用 120s 刷新间隔，防止缓存过期后每次请求都重试 D1；强制刷新仍可提前恢复。
+      siteSettingsCacheExpiry = now + SITE_SETTINGS_CACHE_TTL_MS;
+      return cachedSiteSettings;
+    }
   }
 
   cachedSiteSettings = result;
