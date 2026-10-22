@@ -2817,10 +2817,6 @@ body::before {
     margin-left: -4px;
 }
 
-.checkbox-item .auto-discovery-copy {
-    margin-left: 4px;
-}
-
 .checkbox-item .checkbox-badge {
     padding: 2px 6px;
     border-radius: 3px;

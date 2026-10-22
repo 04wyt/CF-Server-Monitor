@@ -119,6 +119,7 @@
           :copied-note-server-id="copiedNoteServerId"
           :copied-spec-key="copiedSpecKey"
           @add-server="addServer"
+          @auto-discovery-cmd="openAutoDiscoveryModal"
           @batch-edit="openBatchEditModal"
           @batch-delete="batchDelete"
           @toggle-select-all="toggleSelectAll"
@@ -142,8 +143,6 @@
           :password-visible="passwordVisible"
           :active-tab="activeTab"
           :selected-api-base="selectedApiBase"
-          :auto-discovery-command="autoDiscoveryInstallCommand"
-          :auto-discovery-saved="savedAutoDiscovery"
           :current-origin="currentOrigin"
           :saving="saving"
           :change-admin-password="changeAdminPassword"
@@ -289,6 +288,27 @@
         @update:install-gh-proxy="installGhProxy = $event"
         @update:install-version="installVersion = $event"
         @open-edit-from-copy="openEditModalFromCopy"
+      />
+
+      <AutoDiscoveryCommandModal
+        :trans="trans"
+        :show="showAutoDiscoveryModal"
+        :target-os="autoDiscoveryTargetOs"
+        :install-mode="autoDiscoveryInstallMode"
+        :name="autoDiscoveryName"
+        :version="autoDiscoveryVersion"
+        :auto-update="autoDiscoveryAutoUpdate"
+        :gh-proxy="autoDiscoveryGhProxy"
+        :install-command="getAutoDiscoveryInstallCommand()"
+        :copied="autoDiscoveryCopied"
+        @close="closeAutoDiscoveryModal"
+        @copy-cmd="copyAutoDiscoveryCmd"
+        @update:target-os="autoDiscoveryTargetOs = $event"
+        @update:install-mode="autoDiscoveryInstallMode = $event"
+        @update:name="autoDiscoveryName = $event"
+        @update:version="autoDiscoveryVersion = $event"
+        @update:auto-update="autoDiscoveryAutoUpdate = $event"
+        @update:gh-proxy="autoDiscoveryGhProxy = $event"
       />
 
       <div id="dbModal" class="modal-overlay" :class="{ active: showDbModal }">
@@ -590,6 +610,7 @@ import EditServerModal from './components/EditServerModal.vue'
 import BatchEditServersModal from './components/BatchEditServersModal.vue'
 import DeleteServerModal from './components/DeleteServerModal.vue'
 import CopyCommandModal from './components/CopyCommandModal.vue'
+import AutoDiscoveryCommandModal from './components/AutoDiscoveryCommandModal.vue'
 import { adminApi, login, logout as apiLogout, upgradeDatabase, clearHistory, fetchConfig } from '../../utils/api'
 import { hasMultipleApiBases, getApiBases } from '../../utils/config.js'
 import { copyTextToClipboard } from '../../utils/clipboard.js'
@@ -1149,6 +1170,14 @@ const rxCorrection = ref('')
 const txCorrection = ref('')
 const autoUpdate = ref(false)
 const copiedCmd = ref(false)
+const showAutoDiscoveryModal = ref(false)
+const autoDiscoveryTargetOs = ref('linux')
+const autoDiscoveryInstallMode = ref('current-user')
+const autoDiscoveryName = ref('')
+const autoDiscoveryVersion = ref('')
+const autoDiscoveryAutoUpdate = ref(false)
+const autoDiscoveryGhProxy = ref('')
+const autoDiscoveryCopied = ref(false)
 
 const isWssReportEnabled = computed(() => settings.value.wss_report_enabled === true)
 const getEffectiveConnectionMode = (value) => {
@@ -1743,12 +1772,12 @@ const getUninstallCommand = () => {
   if (isGo) {
     if (deleteTargetOs.value === 'windows') {
       const ghUrl = buildGhRawUrl(proxy, '/huilang-me/cfsm-agent/main/install.ps1')
-      const proxyParam = proxy ? ` ${quotePowerShellArg(`--install-ghproxy=${proxy}`)}` : ''
+      const proxyParam = proxy ? ` --install-ghproxy=${quotePowerShellArg(proxy)}` : ''
       return `$script = "$env:TEMP\\install-cf-probe.ps1"; Invoke-WebRequest -Uri ${quotePowerShellArg(ghUrl)} -OutFile $script -UseBasicParsing; PowerShell -ExecutionPolicy Bypass -File $script uninstall${proxyParam}`
     }
     const sudoPrefix = deleteTargetOs.value === 'mac' ? 'sudo ' : ''
     const ghUrl = buildGhRawUrl(proxy, '/huilang-me/cfsm-agent/main/install.sh')
-    const proxyParam = proxy ? ` ${quotePosixShellArg(`--install-ghproxy=${proxy}`)}` : ''
+    const proxyParam = proxy ? ` --install-ghproxy=${quotePosixShellArg(proxy)}` : ''
     const uninstallCommand = `curl -fsSL ${quotePosixShellArg(ghUrl)} | ${sudoPrefix}sh -s -- uninstall${proxyParam}`
     if (deleteTargetOs.value === 'linux' && deleteInstallMode.value === 'cfsm-user') {
       return buildUninstallAsCfsmCommand(uninstallCommand)
@@ -1886,8 +1915,8 @@ const getCustomInstallCommand = () => {
     const params = [
       'install'
     ]
-    if (proxy) params.push(quotePowerShellArg(`--install-ghproxy=${proxy}`))
-    if (version) params.push(quotePowerShellArg(`--install-version=${version}`))
+    if (proxy) params.push(`--install-ghproxy=${quotePowerShellArg(proxy)}`)
+    if (version) params.push(`--install-version=${quotePowerShellArg(version)}`)
     params.push(
       `-id='${copyServerId.value}'`,
       `-secret=${quotePowerShellArg(apiSecret.value)}`,
@@ -1908,8 +1937,8 @@ const getCustomInstallCommand = () => {
     ].join('\n')
   }
   const params = ['install']
-  if (proxy) params.push(quotePosixShellArg(`--install-ghproxy=${proxy}`))
-  if (version) params.push(quotePosixShellArg(`--install-version=${version}`))
+  if (proxy) params.push(`--install-ghproxy=${quotePosixShellArg(proxy)}`)
+  if (version) params.push(`--install-version=${quotePosixShellArg(version)}`)
   params.push(
     `-id=${copyServerId.value}`,
     `-secret=${quotePosixShellArg(apiSecret.value)}`,
@@ -1923,18 +1952,83 @@ const getCustomInstallCommand = () => {
   return buildInstallAsCfsmCommand(installCommand, trans.value.nonRootInstallRunStep)
 }
 
-// 自动发现模式下安装命令不带 -id：Agent 首次上报时由服务端自动创建服务器
-const autoDiscoveryInstallCommand = computed(() => {
+// 自动发现模式下安装命令不带 -id：Agent 首次上报时由服务端自动创建服务器。
+// name 留空时服务端回退到请求来源 IP；安装用户、代理、版本、名称与自动更新仅影响本次生成的命令。
+const buildAutoDiscoveryCommand = ({ targetOs: os = 'linux', installMode: mode = 'current-user', ghProxy = '', name = '', version = '', autoUpdate = false } = {}) => {
   const HOST = selectedApiBase.value
-  const params = [
-    'install',
+  const proxy = String(ghProxy || '').trim()
+  const agentVersion = String(version || '').trim()
+  const autoUpdateFlag = autoUpdate ? 1 : 0
+  const serverName = String(name || '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, 100)
+
+  if (os === 'windows') {
+    const params = ['install']
+    if (proxy) params.push(`--install-ghproxy=${quotePowerShellArg(proxy)}`)
+    if (agentVersion) params.push(`--install-version=${quotePowerShellArg(agentVersion)}`)
+    params.push(
+      `-secret=${quotePowerShellArg(apiSecret.value)}`,
+      `-url='${HOST}/update'`,
+      `-auto_update='${autoUpdateFlag}'`
+    )
+    if (serverName) params.push(`-name=${quotePowerShellArg(serverName)}`)
+    const ghUrl = buildGhRawUrl(proxy, '/huilang-me/cfsm-agent/main/install.ps1')
+    return `$script = "$env:TEMP\\install-cf-probe.ps1"; Invoke-WebRequest -Uri ${quotePowerShellArg(ghUrl)} -OutFile $script -UseBasicParsing; PowerShell -ExecutionPolicy Bypass -File $script ${params.join(' ')}`
+  }
+
+  const params = ['install']
+  if (proxy) params.push(`--install-ghproxy=${quotePosixShellArg(proxy)}`)
+  if (agentVersion) params.push(`--install-version=${quotePosixShellArg(agentVersion)}`)
+  params.push(
     `-secret=${quotePosixShellArg(apiSecret.value)}`,
     `-url=${HOST}/update`,
-    '-auto_update=0'
-  ]
-  const ghUrl = buildGhRawUrl('', '/huilang-me/cfsm-agent/main/install.sh')
-  return `curl -fsSL ${quotePosixShellArg(ghUrl)} | sh -s -- ${params.join(' ')}`
+    `-auto_update=${autoUpdateFlag}`
+  )
+  if (serverName) params.push(`-name=${quotePosixShellArg(serverName)}`)
+  const ghUrl = buildGhRawUrl(proxy, '/huilang-me/cfsm-agent/main/install.sh')
+  const installCommand = `curl -fsSL ${quotePosixShellArg(ghUrl)} | sh -s -- ${params.join(' ')}`
+  if (os !== 'linux' || mode !== 'cfsm-user') return installCommand
+
+  return buildInstallAsCfsmCommand(installCommand, trans.value.nonRootInstallRunStep)
+}
+
+const getAutoDiscoveryInstallCommand = () => buildAutoDiscoveryCommand({
+  targetOs: autoDiscoveryTargetOs.value,
+  installMode: autoDiscoveryInstallMode.value,
+  ghProxy: autoDiscoveryGhProxy.value,
+  name: autoDiscoveryName.value,
+  version: autoDiscoveryVersion.value,
+  autoUpdate: autoDiscoveryAutoUpdate.value
 })
+
+const openAutoDiscoveryModal = () => {
+  if (!savedAutoDiscovery.value) {
+    alertMessage.value = trans.value.autoAddDisabledTip
+    return
+  }
+
+  autoDiscoveryCopied.value = false
+  showAutoDiscoveryModal.value = true
+}
+
+const closeAutoDiscoveryModal = () => {
+  showAutoDiscoveryModal.value = false
+}
+
+const copyAutoDiscoveryCmd = async () => {
+  const copied = await copyTextToClipboard(getAutoDiscoveryInstallCommand())
+  if (!copied) {
+    alertMessage.value = trans.value.httpsRequired
+    return
+  }
+
+  autoDiscoveryCopied.value = true
+  setTimeout(() => {
+    autoDiscoveryCopied.value = false
+  }, 1500)
+}
 
 const copyCustomCmd = async () => {
   const cmd = getCustomInstallCommand()

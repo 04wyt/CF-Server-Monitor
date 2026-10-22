@@ -182,12 +182,6 @@
             <input type="checkbox" id="cfg_auto_discovery" v-model="settings.auto_discovery">
             <label><b>{{ trans.autoDiscovery }}</b></label>
             <HelpTooltip :text="trans.autoDiscoveryTip" />
-            <button
-              v-if="autoDiscoverySaved"
-              type="button"
-              class="btn btn-sm auto-discovery-copy"
-              @click="copyAutoDiscoveryCommand"
-            >{{ autoDiscoveryCopied ? '✅ ' + trans.copied : '📋 ' + trans.copyCommand }}</button>
           </div>
         </div>
 
@@ -820,7 +814,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import HelpTooltip from '../../../components/HelpTooltip.vue'
 import { FRONTEND_WS_TIMEOUT_MINUTES_MAX, HISTORY } from '../../../utils/constants.js'
 import { PING_NODE_FIELDS, validatePingNode } from '../../../utils/pingNode.js'
-import { copyTextToClipboard } from '../../../utils/clipboard.js'
 
 const props = defineProps({
   trans: { type: Object, required: true },
@@ -829,8 +822,6 @@ const props = defineProps({
   passwordVisible: { type: Object, required: true },
   activeTab: { type: String, default: 'settings' },
   selectedApiBase: { type: String, default: '' },
-  autoDiscoveryCommand: { type: String, default: '' },
-  autoDiscoverySaved: { type: Boolean, default: false },
   currentOrigin: { type: String, default: '' },
   saving: { type: Boolean, default: false },
   changeAdminPassword: { type: Boolean, default: false },
@@ -1370,21 +1361,6 @@ const addResourceAlertRule = () => {
 
 const removeResourceAlertRule = (index) => {
   ensureResourceAlertRules().splice(index, 1)
-}
-
-// 自动发现模式下复制的 Linux 安装命令不带 -id，Agent 首次上报时由服务端建号
-const autoDiscoveryCopied = ref(false)
-const copyAutoDiscoveryCommand = async () => {
-  const copied = await copyTextToClipboard(props.autoDiscoveryCommand)
-  if (!copied) {
-    emit('alert-message', props.trans.httpsRequired)
-    return
-  }
-
-  autoDiscoveryCopied.value = true
-  setTimeout(() => {
-    autoDiscoveryCopied.value = false
-  }, 1500)
 }
 
 const pingNodeErrorMessage = computed(() => (
