@@ -4,6 +4,12 @@ import {
   SITE_SETTINGS_CACHE_TTL_MS
 } from './config.js';
 import { normalizePct } from './traffic.js';
+import {
+  AUTO_LANGUAGE,
+  DEFAULT_NOTIFICATION_LANGUAGE,
+  normalizeLanguagePreference,
+  normalizeNotificationLanguagePreference
+} from '../shared/languages.js';
 
 export const APPEARANCE_FIELDS = ['site_title', 'custom_bg', 'custom_bg_mobile', 'favicon', 'custom_head', 'custom_script', 'csp_static', 'csp_api', 'display_mode', 'preferred_theme', 'default_language', 'theme_options'];
 
@@ -17,8 +23,7 @@ export const LONG_HISTORY_POINT_OPTIONS = [60, 120, 180, 240];
 export const DEFAULT_LONG_HISTORY_POINTS = 120;
 export const FRONTEND_WS_TIMEOUT_MINUTES_MAX = 1440;
 export const DEFAULT_NOTIFICATION_TIMEZONE = 'UTC';
-export const NOTIFICATION_LANGUAGES = ['zh', 'en', 'es'];
-export const DEFAULT_NOTIFICATION_LANGUAGE = 'zh';
+export { DEFAULT_NOTIFICATION_LANGUAGE };
 export const DEFAULT_EXPIRE_NOTIFICATION_TIME = '12';
 export const ALL_WSS_REPORT_HOURS = Object.freeze(Array.from({ length: 24 }, (_, hour) => hour));
 export const RESOURCE_ALERT_WINDOW_MIN = 5;
@@ -473,15 +478,12 @@ export function normalizePreferredTheme(value, fallback = 'auto') {
   return fallback === 'dark' || fallback === 'light' ? fallback : 'auto';
 }
 
-export function normalizeDefaultLanguage(value, fallback = 'auto') {
-  const language = String(value || '').trim().toLowerCase();
-  if (language === 'zh' || language === 'en' || language === 'es' || language === 'auto') return language;
-  return fallback === 'zh' || fallback === 'en' || fallback === 'es' ? fallback : 'auto';
+export function normalizeDefaultLanguage(value, fallback = AUTO_LANGUAGE) {
+  return normalizeLanguagePreference(value, fallback);
 }
 
 export function normalizeNotificationLanguage(value) {
-  const language = String(value || '').trim().toLowerCase();
-  return NOTIFICATION_LANGUAGES.includes(language) ? language : DEFAULT_NOTIFICATION_LANGUAGE;
+  return normalizeNotificationLanguagePreference(value);
 }
 
 export function normalizeBooleanSetting(value, fallback = 'false') {

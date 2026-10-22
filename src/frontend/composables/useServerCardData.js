@@ -224,7 +224,7 @@ export function useServerCardData(props) {
     const hours = Math.floor((totalSeconds % 86400) / 3600)
     const minutes = Math.floor((totalSeconds % 3600) / 60)
     const seconds = totalSeconds % 60
-    const zh = currentLang.value === 'zh'
+    const zh = currentLang.value.startsWith('zh')
     const parts = []
 
     if (days > 0) parts.push(zh ? `${days}天` : `${days}d`)

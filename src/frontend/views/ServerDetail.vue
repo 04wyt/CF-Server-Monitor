@@ -407,7 +407,7 @@ import { isAdminLoggedIn } from '../utils/http'
 import { getTrafficUsageBytes } from '../composables/useServerCardData'
 import { getPublicAssetUrl } from '../utils/config.js'
 import Chart from 'chart.js/auto'
-import { t, currentLang, useTranslation } from '../utils/i18n'
+import { t, useTranslation } from '../utils/i18n'
 import { CHART, HISTORY } from '../utils/constants'
 import { formatDateTime, normalizeTimestamp as normalizeMetricTimestamp } from '../utils/time.js'
 import useTheme from '../composables/useTheme'
@@ -455,9 +455,7 @@ const ChartExpandButton = {
   },
   emits: ['toggle'],
   setup(props, { emit }) {
-    const getLabel = () => props.expanded
-      ? (currentLang.value === 'en' ? 'Collapse chart' : '收起图表')
-      : (currentLang.value === 'en' ? 'Expand chart' : '放大图表')
+    const getLabel = () => props.expanded ? trans.value.collapseChart : trans.value.expandChart
 
     return () => h('button', {
       type: 'button',
