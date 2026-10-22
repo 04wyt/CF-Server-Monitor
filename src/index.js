@@ -440,10 +440,6 @@ export default {
         }
 
         if (setTurnstileVerified) {
-          const expires = Math.floor(Date.now() / 1000) + 3600;
-          const cookieData = { expires, verified: true, timestamp: Date.now() };
-          const encryptedData = await encryptTurnstileData(cookieData, env, sys);
-
           const finalHeaders = new Headers(response.headers);
           finalHeaders.set('Access-Control-Allow-Origin', request.headers.get('Origin') || '');
           finalHeaders.set('Access-Control-Allow-Credentials', 'true');

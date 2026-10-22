@@ -28,7 +28,7 @@ async function loadFrontendFiles(env) {
 
     if (env.ASSETS) {
       try {
-        const mainFiles = ['dashboard.html', 'style.css'];
+        const mainFiles = ['dashboard.html'];
         for (const filename of mainFiles) {
           try {
             const res = await env.ASSETS.fetch(new Request(`http://static/${filename}`));

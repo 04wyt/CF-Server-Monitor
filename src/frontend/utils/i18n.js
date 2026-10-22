@@ -109,8 +109,9 @@ export const getLanguage = () => currentLang.value
 
 export const applyDefaultLanguage = async (lang) => {
   defaultLanguage = normalizeLanguagePreference(lang)
-  const storedLanguage = normalizeLanguagePreference(localStorage.getItem(LANGUAGE_STORAGE_KEY), '')
-  const resolvedLang = storedLanguage || resolveLanguagePreference(defaultLanguage)
+  // 没有有效的本地偏好时使用站点默认语言，再将 auto 解析为浏览器语言。
+  const storedLanguage = normalizeLanguagePreference(localStorage.getItem(LANGUAGE_STORAGE_KEY), defaultLanguage)
+  const resolvedLang = resolveLanguagePreference(storedLanguage)
   const loaded = await loadLanguage(resolvedLang)
   const nextLang = loaded ? resolvedLang : DEFAULT_LANGUAGE
   currentLang.value = nextLang
